@@ -324,8 +324,8 @@
         const SUPABASE_URL = 'https://gkaaewdozkcsgftjolhw.supabase.co';
         const SUPABASE_ANON_KEY = 'sb_publishable_IIfsmYkbBgGZvKpg-QKO-w_naRY9O7t';
         
-        // Initialize Supabase
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // Initialize Supabase - FIXED: Use different variable name
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         
         // ================= APP STATE =================
         let currentUser = null;
@@ -360,14 +360,14 @@
 
             try {
                 // Try to sign in first
-                let { data, error } = await supabase.auth.signInWithPassword({
+                let { data, error } = await supabaseClient.auth.signInWithPassword({
                     email: email,
                     password: password
                 });
 
                 // If user doesn't exist, create account
                 if (error && error.message.includes('Invalid login credentials')) {
-                    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+                    const { data: signUpData, error: signUpError } = await supabaseClient.auth.signUp({
                         email: email,
                         password: password
                     });
@@ -393,7 +393,7 @@
         }
 
         async function signOut() {
-            await supabase.auth.signOut();
+            await supabaseClient.auth.signOut();
             currentUser = null;
             if (subscription) subscription.unsubscribe();
             tasks = [];
@@ -425,7 +425,7 @@
             await fetchTasks();
 
             // Subscribe to real-time changes
-            subscription = supabase
+            subscription = supabaseClient
                 .channel('tasks-channel')
                 .on('postgres_changes', 
                     { event: '*', schema: 'public', table: 'tasks', filter: `user_id=eq.${currentUser.id}` },
@@ -437,7 +437,7 @@
         }
 
         async function fetchTasks() {
-            const { data, error } = await supabase
+            const { data, error } = await supabaseClient
                 .from('tasks')
                 .select('*')
                 .eq('user_id', currentUser.id)
@@ -465,7 +465,7 @@
 
             if (!currentUser) return;
 
-            const { error } = await supabase
+            const { error } = await supabaseClient
                 .from('tasks')
                 .insert([
                     {
@@ -491,7 +491,7 @@
             const task = tasks.find(t => t.id === id);
             if (!task) return;
 
-            const { error } = await supabase
+            const { error } = await supabaseClient
                 .from('tasks')
                 .update({ completed: !task.completed })
                 .eq('id', id);
@@ -506,7 +506,7 @@
         }
 
         async function deleteTask(id) {
-            const { error } = await supabase
+            const { error } = await supabaseClient
                 .from('tasks')
                 .delete()
                 .eq('id', id);
@@ -634,7 +634,7 @@
         // ================= INITIALIZATION =================
 
         // Check for existing session
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        supabaseClient.auth.getSession().then(({ data: { session } }) => {
             if (session?.user) {
                 currentUser = session.user;
                 showApp();
@@ -644,7 +644,7 @@
         });
 
         // Listen for auth changes
-        supabase.auth.onAuthStateChange((event, session) => {
+        supabaseClient.auth.onAuthStateChange((event, session) => {
             if (event === 'SIGNED_IN' && session?.user) {
                 currentUser = session.user;
                 showApp();
