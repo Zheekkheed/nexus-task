@@ -3,29 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nexus Cloud Tasks</title>
+    <title>Nexus Cloud Tasks - Supabase</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- FIREBASE SCRIPTS MUST LOAD FIRST -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    
-    <!-- YOUR FIREBASE CONFIG - REPLACE THESE VALUES -->
-    <script>
-        const firebaseConfig = {
-  apiKey: "AIzaSyCB4lYf_T1ipyd43niT8nHCEjoceCBC2RU",
-  authDomain: "nexus-tasks-v2.firebaseapp.com",
-  projectId: "nexus-tasks-v2",
-  storageBucket: "nexus-tasks-v2.firebasestorage.app",
-  messagingSenderId: "484518548569",
-  appId: "1:484518548569:web:1da29918846cc4bf284d48",
-  measurementId: "G-45RBPR9ENZ"
-};
-        
-        // Initialize Firebase immediately
-        firebase.initializeApp(firebaseConfig);
-    </script>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -195,7 +176,6 @@
     </style>
 </head>
 <body class="text-white relative">
-    <!-- Background -->
     <div class="blob blob-1"></div>
     <div class="blob blob-2"></div>
 
@@ -217,7 +197,7 @@
                 <div class="space-y-4">
                     <input type="email" id="email-input" placeholder="Email address" 
                            class="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:bg-white/20 transition-all">
-                    <input type="password" id="password-input" placeholder="Password" 
+                    <input type="password" id="password-input" placeholder="Password (min 6 chars)" 
                            class="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:bg-white/20 transition-all">
                     
                     <button id="signin-btn" class="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 rounded-xl transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-lg flex items-center justify-center gap-2">
@@ -226,14 +206,13 @@
                     </button>
                     
                     <p class="text-sm text-white/50 mt-4">Enter any email/password to create an account automatically</p>
-                    <p id="error-message" class="text-red-400 text-sm hidden"></p>
+                    <p id="error-message" class="text-red-400 text-sm hidden mt-2"></p>
                 </div>
             </div>
         </div>
 
         <!-- MAIN APP SECTION -->
         <div id="app-section" class="hidden">
-            <!-- Header -->
             <header class="flex justify-between items-center mb-12 floating">
                 <div class="glass rounded-2xl px-8 py-4 flex items-center gap-4">
                     <div>
@@ -268,9 +247,7 @@
             </header>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <!-- Left Panel -->
                 <div class="space-y-6">
-                    <!-- Add Task -->
                     <div class="glass-card rounded-3xl p-6">
                         <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -293,7 +270,6 @@
                         </button>
                     </div>
 
-                    <!-- Stats -->
                     <div class="glass-card rounded-3xl p-6">
                         <h3 class="text-lg font-semibold mb-4">Overview</h3>
                         <div class="space-y-3">
@@ -315,7 +291,6 @@
                     </div>
                 </div>
 
-                <!-- Right Panel: Task List -->
                 <div class="lg:col-span-2">
                     <div class="glass-card rounded-3xl p-6 min-h-[600px]">
                         <div class="flex justify-between items-center mb-6">
@@ -327,9 +302,7 @@
                             </div>
                         </div>
 
-                        <div id="task-list" class="space-y-3 max-h-[500px] overflow-y-auto pr-2">
-                            <!-- Tasks injected here -->
-                        </div>
+                        <div id="task-list" class="space-y-3 max-h-[500px] overflow-y-auto pr-2"></div>
 
                         <div id="empty-state" class="hidden flex flex-col items-center justify-center py-20 text-center">
                             <div class="w-24 h-24 bg-white/10 rounded-full flex items-center justify-center mb-4">
@@ -345,24 +318,26 @@
         </div>
     </div>
 
-    <!-- ALL JAVASCRIPT AT THE END OF BODY -->
     <script>
+        // ================= SUPABASE CONFIGURATION =================
+        // REPLACE THESE WITH YOUR SUPABASE CREDENTIALS
+        const SUPABASE_URL = 'https://gkaaewdozkcsgftjolhw.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_IIfsmYkbBgGZvKpg-QKO-w_naRY9O7t';
+        
+        // Initialize Supabase
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
         // ================= APP STATE =================
         let currentUser = null;
         let tasks = [];
         let currentCategory = 'work';
         let currentFilter = 'all';
-        let unsubscribe = null;
-        const db = firebase.firestore();
-        const auth = firebase.auth();
-
-        // Enable offline persistence
-        db.enablePersistence({ synchronizeTabs: true }).catch(console.error);
+        let subscription = null;
 
         // ================= AUTH FUNCTIONS =================
         
-        function signIn() {
-            console.log('Sign in clicked'); // Debug log
+        async function signIn() {
+            console.log('Sign in clicked');
             const email = document.getElementById('email-input').value.trim();
             const password = document.getElementById('password-input').value;
             const loginText = document.getElementById('login-text');
@@ -383,27 +358,46 @@
             spinner.classList.remove('hidden');
             errorMsg.classList.add('hidden');
 
-            // Try sign in first, if fails create account
-            auth.signInWithEmailAndPassword(email, password)
-                .catch((error) => {
-                    if (error.code === 'auth/user-not-found') {
-                        // Create new account
-                        return auth.createUserWithEmailAndPassword(email, password);
-                    }
-                    throw error;
-                })
-                .catch((error) => {
-                    console.error('Auth error:', error);
-                    showError(error.message);
-                    loginText.classList.remove('hidden');
-                    spinner.classList.add('hidden');
+            try {
+                // Try to sign in first
+                let { data, error } = await supabase.auth.signInWithPassword({
+                    email: email,
+                    password: password
                 });
+
+                // If user doesn't exist, create account
+                if (error && error.message.includes('Invalid login credentials')) {
+                    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+                        email: email,
+                        password: password
+                    });
+                    
+                    if (signUpError) throw signUpError;
+                    data = signUpData;
+                } else if (error) {
+                    throw error;
+                }
+
+                if (data.user) {
+                    currentUser = data.user;
+                    showApp();
+                    loadTasks();
+                    updateDate();
+                }
+            } catch (error) {
+                console.error('Auth error:', error);
+                showError(error.message);
+                loginText.classList.remove('hidden');
+                spinner.classList.add('hidden');
+            }
         }
 
-        function signOut() {
-            auth.signOut();
-            if (unsubscribe) unsubscribe();
+        async function signOut() {
+            await supabase.auth.signOut();
+            currentUser = null;
+            if (subscription) subscription.unsubscribe();
             tasks = [];
+            showAuth();
         }
 
         function showError(msg) {
@@ -412,27 +406,51 @@
             errorEl.classList.remove('hidden');
         }
 
-        // ================= FIRESTORE FUNCTIONS =================
+        function showApp() {
+            document.getElementById('auth-section').classList.add('hidden');
+            document.getElementById('app-section').classList.remove('hidden');
+        }
 
-        function loadTasks() {
+        function showAuth() {
+            document.getElementById('auth-section').classList.remove('hidden');
+            document.getElementById('app-section').classList.add('hidden');
+        }
+
+        // ================= DATABASE FUNCTIONS =================
+
+        async function loadTasks() {
             if (!currentUser) return;
 
-            unsubscribe = db.collection('users')
-                .doc(currentUser.uid)
-                .collection('tasks')
-                .orderBy('createdAt', 'desc')
-                .onSnapshot((snapshot) => {
-                    tasks = [];
-                    snapshot.forEach((doc) => {
-                        tasks.push({ id: doc.id, ...doc.data() });
-                    });
-                    renderTasks();
-                    updateStats();
-                    updateConnectionStatus(true);
-                }, (error) => {
-                    console.error('Error loading tasks:', error);
-                    updateConnectionStatus(false);
-                });
+            // Initial load
+            await fetchTasks();
+
+            // Subscribe to real-time changes
+            subscription = supabase
+                .channel('tasks-channel')
+                .on('postgres_changes', 
+                    { event: '*', schema: 'public', table: 'tasks', filter: `user_id=eq.${currentUser.id}` },
+                    (payload) => {
+                        fetchTasks();
+                    }
+                )
+                .subscribe();
+        }
+
+        async function fetchTasks() {
+            const { data, error } = await supabase
+                .from('tasks')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('Error fetching tasks:', error);
+                return;
+            }
+
+            tasks = data || [];
+            renderTasks();
+            updateStats();
         }
 
         async function addTask() {
@@ -447,72 +465,61 @@
 
             if (!currentUser) return;
 
-            try {
-                await db.collection('users')
-                    .doc(currentUser.uid)
-                    .collection('tasks')
-                    .add({
+            const { error } = await supabase
+                .from('tasks')
+                .insert([
+                    {
+                        user_id: currentUser.id,
                         text: text,
                         category: currentCategory,
-                        completed: false,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                
-                input.value = '';
-                createConfetti();
-            } catch (error) {
+                        completed: false
+                    }
+                ]);
+
+            if (error) {
                 console.error('Error adding task:', error);
                 alert('Failed to add task: ' + error.message);
+                return;
             }
+
+            input.value = '';
+            createConfetti();
+            await fetchTasks();
         }
 
         async function toggleTask(id) {
             const task = tasks.find(t => t.id === id);
-            if (!task || !currentUser) return;
+            if (!task) return;
 
-            try {
-                await db.collection('users')
-                    .doc(currentUser.uid)
-                    .collection('tasks')
-                    .doc(id)
-                    .update({
-                        completed: !task.completed,
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
+            const { error } = await supabase
+                .from('tasks')
+                .update({ completed: !task.completed })
+                .eq('id', id);
 
-                if (!task.completed) createConfetti();
-            } catch (error) {
+            if (error) {
                 console.error('Error updating task:', error);
+                return;
             }
+
+            if (!task.completed) createConfetti();
+            await fetchTasks();
         }
 
         async function deleteTask(id) {
-            if (!currentUser) return;
-            try {
-                await db.collection('users')
-                    .doc(currentUser.uid)
-                    .collection('tasks')
-                    .doc(id)
-                    .delete();
-            } catch (error) {
+            const { error } = await supabase
+                .from('tasks')
+                .delete()
+                .eq('id', id);
+
+            if (error) {
                 console.error('Error deleting task:', error);
+                return;
             }
+
+            await fetchTasks();
         }
 
         // ================= UI FUNCTIONS =================
-
-        function updateConnectionStatus(online) {
-            const statusBadge = document.getElementById('connection-status');
-            const statusText = document.getElementById('status-text');
-            
-            if (online) {
-                statusBadge.className = 'online-badge px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-2';
-                statusText.textContent = 'Synced';
-            } else {
-                statusBadge.className = 'offline-badge px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-2';
-                statusText.textContent = 'Offline';
-            }
-        }
 
         function updateDate() {
             const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
@@ -626,46 +633,47 @@
 
         // ================= INITIALIZATION =================
 
-        // Auth state listener
-        auth.onAuthStateChanged((user) => {
-            if (user) {
-                currentUser = user;
-                document.getElementById('auth-section').classList.add('hidden');
-                document.getElementById('app-section').classList.remove('hidden');
+        // Check for existing session
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session?.user) {
+                currentUser = session.user;
+                showApp();
                 loadTasks();
                 updateDate();
-            } else {
-                document.getElementById('auth-section').classList.remove('hidden');
-                document.getElementById('app-section').classList.add('hidden');
             }
         });
 
-        // Event listeners (using addEventListener instead of inline)
+        // Listen for auth changes
+        supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'SIGNED_IN' && session?.user) {
+                currentUser = session.user;
+                showApp();
+                loadTasks();
+                updateDate();
+            } else if (event === 'SIGNED_OUT') {
+                currentUser = null;
+                showAuth();
+            }
+        });
+
+        // Event listeners
         document.addEventListener('DOMContentLoaded', function() {
-            // Sign in button
             document.getElementById('signin-btn').addEventListener('click', signIn);
-            
-            // Sign out button
             document.getElementById('signout-btn').addEventListener('click', signOut);
-            
-            // Add task button
             document.getElementById('add-task-btn').addEventListener('click', addTask);
             
-            // Category buttons
             document.querySelectorAll('.category-pill').forEach(btn => {
                 btn.addEventListener('click', function() {
                     setCategory(this.dataset.cat);
                 });
             });
             
-            // Filter buttons
             document.querySelectorAll('.filter-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     filterTasks(this.dataset.filter);
                 });
             });
             
-            // Enter key on inputs
             document.getElementById('email-input').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') signIn();
             });
@@ -675,10 +683,6 @@
             document.getElementById('task-input').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') addTask();
             });
-            
-            // Network status
-            window.addEventListener('online', () => updateConnectionStatus(true));
-            window.addEventListener('offline', () => updateConnectionStatus(false));
         });
     </script>
 </body>
