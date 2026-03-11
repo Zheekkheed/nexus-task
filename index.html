@@ -5,10 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nexus Cloud Tasks</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Firebase SDK -->
+    
+    <!-- FIREBASE SCRIPTS MUST LOAD FIRST -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    
+    <!-- YOUR FIREBASE CONFIG - REPLACE THESE VALUES -->
+    <script>
+        const firebaseConfig = {
+  apiKey: "AIzaSyACOfxM2xkBrbJ7WDWv6uo1AhRIbbrg3D0",
+  authDomain: "nexus-tasks-2fc15.firebaseapp.com",
+  projectId: "nexus-tasks-2fc15",
+  storageBucket: "nexus-tasks-2fc15.firebasestorage.app",
+  messagingSenderId: "1021983518867",
+  appId: "1:1021983518867:web:71b03c6f7782089ef29d66",
+  measurementId: "G-Z8NQ608L34"
+};
+        
+        // Initialize Firebase immediately
+        firebase.initializeApp(firebaseConfig);
+    </script>
+    
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { font-family: 'Space Grotesk', sans-serif; }
@@ -156,7 +174,12 @@
             100% { transform: rotate(360deg); }
         }
 
-        .sync-indicator {
+        .online-badge {
+            background: rgba(34, 197, 94, 0.8);
+        }
+
+        .offline-badge {
+            background: rgba(239, 68, 68, 0.8);
             animation: pulse 2s infinite;
         }
 
@@ -165,16 +188,6 @@
             50% { opacity: 0.5; }
         }
 
-        .offline-badge {
-            background: rgba(239, 68, 68, 0.8);
-            animation: pulse 2s infinite;
-        }
-
-        .online-badge {
-            background: rgba(34, 197, 94, 0.8);
-        }
-
-        /* Scrollbar styling */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 4px; }
@@ -182,17 +195,20 @@
     </style>
 </head>
 <body class="text-white relative">
-    <!-- Animated Background Blobs -->
+    <!-- Background -->
     <div class="blob blob-1"></div>
     <div class="blob blob-2"></div>
 
     <div class="container mx-auto px-4 py-8 max-w-6xl relative z-10">
-        <!-- Auth Section (Shown when not logged in) -->
+        
+        <!-- AUTH SECTION -->
         <div id="auth-section" class="min-h-screen flex items-center justify-center">
             <div class="glass-card rounded-3xl p-8 w-full max-w-md text-center">
                 <div class="mb-6">
                     <div class="w-20 h-20 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full mx-auto flex items-center justify-center mb-4">
-                        <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                        <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                        </svg>
                     </div>
                     <h1 class="text-3xl font-bold mb-2">Nexus Cloud</h1>
                     <p class="text-white/70">Sync your tasks across all devices</p>
@@ -204,26 +220,25 @@
                     <input type="password" id="password-input" placeholder="Password" 
                            class="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white placeholder-white/50 focus:bg-white/20 transition-all">
                     
-                    <button onclick="signIn()" class="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 rounded-xl transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-lg flex items-center justify-center gap-2">
+                    <button id="signin-btn" class="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 rounded-xl transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-lg flex items-center justify-center gap-2">
                         <span id="login-text">Sign In / Create Account</span>
                         <div id="login-spinner" class="loading-spinner hidden"></div>
                     </button>
                     
                     <p class="text-sm text-white/50 mt-4">Enter any email/password to create an account automatically</p>
+                    <p id="error-message" class="text-red-400 text-sm hidden"></p>
                 </div>
             </div>
         </div>
 
-        <!-- Main App (Shown when logged in) -->
+        <!-- MAIN APP SECTION -->
         <div id="app-section" class="hidden">
             <!-- Header -->
             <header class="flex justify-between items-center mb-12 floating">
                 <div class="glass rounded-2xl px-8 py-4 flex items-center gap-4">
                     <div>
-                        <h1 class="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-purple-200">
-                            Nexus Cloud
-                        </h1>
-                        <p class="text-purple-200 text-sm mt-1" id="current-date">Loading date...</p>
+                        <h1 class="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-purple-200">Nexus Cloud</h1>
+                        <p class="text-purple-200 text-sm mt-1" id="current-date">Loading...</p>
                     </div>
                     <div id="connection-status" class="online-badge px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-2">
                         <span class="w-2 h-2 bg-white rounded-full"></span>
@@ -244,19 +259,23 @@
                         </svg>
                     </div>
                     
-                    <button onclick="signOut()" class="glass p-4 rounded-2xl hover:bg-white/20 transition-all" title="Sign Out">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                    <button id="signout-btn" class="glass p-4 rounded-2xl hover:bg-white/20 transition-all" title="Sign Out">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                        </svg>
                     </button>
                 </div>
             </header>
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <!-- Left Panel: Input & Stats -->
+                <!-- Left Panel -->
                 <div class="space-y-6">
-                    <!-- Add Task Card -->
+                    <!-- Add Task -->
                     <div class="glass-card rounded-3xl p-6">
                         <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                            </svg>
                             New Task
                         </h2>
                         
@@ -264,17 +283,17 @@
                                class="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 mb-4 text-white placeholder-white/50 focus:bg-white/20 transition-all">
                         
                         <div class="flex gap-2 mb-4">
-                            <button onclick="setCategory('work')" class="category-pill active px-4 py-2 rounded-full text-sm bg-white/10 border border-white/20 hover:bg-white/20" data-cat="work">Work</button>
-                            <button onclick="setCategory('personal')" class="category-pill px-4 py-2 rounded-full text-sm bg-white/10 border border-white/20 hover:bg-white/20" data-cat="personal">Personal</button>
-                            <button onclick="setCategory('urgent')" class="category-pill px-4 py-2 rounded-full text-sm bg-white/10 border border-white/20 hover:bg-white/20" data-cat="urgent">Urgent</button>
+                            <button class="category-pill active px-4 py-2 rounded-full text-sm bg-white/10 border border-white/20 hover:bg-white/20" data-cat="work">Work</button>
+                            <button class="category-pill px-4 py-2 rounded-full text-sm bg-white/10 border border-white/20 hover:bg-white/20" data-cat="personal">Personal</button>
+                            <button class="category-pill px-4 py-2 rounded-full text-sm bg-white/10 border border-white/20 hover:bg-white/20" data-cat="urgent">Urgent</button>
                         </div>
                         
-                        <button onclick="addTask()" class="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 rounded-xl transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-lg">
+                        <button id="add-task-btn" class="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-semibold py-3 rounded-xl transition-all transform hover:scale-[1.02] active:scale-[0.98] shadow-lg">
                             Add Task
                         </button>
                     </div>
 
-                    <!-- Stats Card -->
+                    <!-- Stats -->
                     <div class="glass-card rounded-3xl p-6">
                         <h3 class="text-lg font-semibold mb-4">Overview</h3>
                         <div class="space-y-3">
@@ -293,13 +312,6 @@
                                 <span class="font-bold text-2xl text-green-400" id="completed-count">0</span>
                             </div>
                         </div>
-                        
-                        <div class="mt-6 pt-4 border-t border-white/20">
-                            <div class="flex items-center gap-2 text-sm text-white/60">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                                <span>Real-time sync enabled</span>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
@@ -309,19 +321,21 @@
                         <div class="flex justify-between items-center mb-6">
                             <h2 class="text-2xl font-semibold">Your Tasks</h2>
                             <div class="flex gap-2">
-                                <button onclick="filterTasks('all')" class="filter-btn active px-4 py-2 rounded-lg text-sm bg-white/20 hover:bg-white/30 transition-all" data-filter="all">All</button>
-                                <button onclick="filterTasks('active')" class="filter-btn px-4 py-2 rounded-lg text-sm bg-white/10 hover:bg-white/20 transition-all" data-filter="active">Active</button>
-                                <button onclick="filterTasks('completed')" class="filter-btn px-4 py-2 rounded-lg text-sm bg-white/10 hover:bg-white/20 transition-all" data-filter="completed">Completed</button>
+                                <button class="filter-btn active px-4 py-2 rounded-lg text-sm bg-white/20 hover:bg-white/30 transition-all" data-filter="all">All</button>
+                                <button class="filter-btn px-4 py-2 rounded-lg text-sm bg-white/10 hover:bg-white/20 transition-all" data-filter="active">Active</button>
+                                <button class="filter-btn px-4 py-2 rounded-lg text-sm bg-white/10 hover:bg-white/20 transition-all" data-filter="completed">Completed</button>
                             </div>
                         </div>
 
                         <div id="task-list" class="space-y-3 max-h-[500px] overflow-y-auto pr-2">
-                            <!-- Tasks will be injected here -->
+                            <!-- Tasks injected here -->
                         </div>
 
                         <div id="empty-state" class="hidden flex flex-col items-center justify-center py-20 text-center">
                             <div class="w-24 h-24 bg-white/10 rounded-full flex items-center justify-center mb-4">
-                                <svg class="w-12 h-12 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                                <svg class="w-12 h-12 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                                </svg>
                             </div>
                             <p class="text-white/60 text-lg">No tasks yet. Start by adding one!</p>
                         </div>
@@ -331,90 +345,59 @@
         </div>
     </div>
 
-    <script src="js/config.js"></script>
-<script>
-// Initialize Firebase using config from config.js
-firebase.initializeApp(firebaseConfig);
-</script>
-
-        // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-        const auth = firebase.auth();
-        
-        // Enable offline persistence
-        db.enablePersistence({ synchronizeTabs: true })
-            .catch((err) => {
-                if (err.code == 'failed-precondition') {
-                    console.log('Multiple tabs open, persistence enabled in first tab only');
-                } else if (err.code == 'unimplemented') {
-                    console.log('Browser does not support offline persistence');
-                }
-            });
-
+    <!-- ALL JAVASCRIPT AT THE END OF BODY -->
+    <script>
         // ================= APP STATE =================
         let currentUser = null;
         let tasks = [];
         let currentCategory = 'work';
         let currentFilter = 'all';
         let unsubscribe = null;
+        const db = firebase.firestore();
+        const auth = firebase.auth();
 
-        // ================= AUTHENTICATION =================
+        // Enable offline persistence
+        db.enablePersistence({ synchronizeTabs: true }).catch(console.error);
+
+        // ================= AUTH FUNCTIONS =================
         
-        // Check auth state
-        auth.onAuthStateChanged((user) => {
-            if (user) {
-                currentUser = user;
-                showApp();
-                loadTasks();
-                updateDate();
-            } else {
-                showAuth();
-            }
-        });
-
-        function showAuth() {
-            document.getElementById('auth-section').classList.remove('hidden');
-            document.getElementById('app-section').classList.add('hidden');
-        }
-
-        function showApp() {
-            document.getElementById('auth-section').classList.add('hidden');
-            document.getElementById('app-section').classList.remove('hidden');
-        }
-
-        async function signIn() {
+        function signIn() {
+            console.log('Sign in clicked'); // Debug log
             const email = document.getElementById('email-input').value.trim();
             const password = document.getElementById('password-input').value;
             const loginText = document.getElementById('login-text');
             const spinner = document.getElementById('login-spinner');
+            const errorMsg = document.getElementById('error-message');
 
             if (!email || !password) {
-                alert('Please enter both email and password');
+                showError('Please enter both email and password');
+                return;
+            }
+
+            if (password.length < 6) {
+                showError('Password must be at least 6 characters');
                 return;
             }
 
             loginText.classList.add('hidden');
             spinner.classList.remove('hidden');
+            errorMsg.classList.add('hidden');
 
-            try {
-                // Try to sign in first
-                await auth.signInWithEmailAndPassword(email, password);
-            } catch (error) {
-                if (error.code === 'auth/user-not-found') {
-                    // If user doesn't exist, create account
-                    try {
-                        await auth.createUserWithEmailAndPassword(email, password);
-                    } catch (createError) {
-                        alert('Error: ' + createError.message);
+            // Try sign in first, if fails create account
+            auth.signInWithEmailAndPassword(email, password)
+                .catch((error) => {
+                    if (error.code === 'auth/user-not-found') {
+                        // Create new account
+                        return auth.createUserWithEmailAndPassword(email, password);
                     }
-                } else {
-                    alert('Error: ' + error.message);
-                }
-            } finally {
-                loginText.classList.remove('hidden');
-                spinner.classList.add('hidden');
-            }
+                    throw error;
+                })
+                .catch((error) => {
+                    console.error('Auth error:', error);
+                    showError(error.message);
+                    loginText.classList.remove('hidden');
+                    spinner.classList.add('hidden');
+                });
         }
 
         function signOut() {
@@ -423,12 +406,17 @@ firebase.initializeApp(firebaseConfig);
             tasks = [];
         }
 
-        // ================= FIRESTORE OPERATIONS =================
+        function showError(msg) {
+            const errorEl = document.getElementById('error-message');
+            errorEl.textContent = msg;
+            errorEl.classList.remove('hidden');
+        }
+
+        // ================= FIRESTORE FUNCTIONS =================
 
         function loadTasks() {
             if (!currentUser) return;
 
-            // Real-time listener
             unsubscribe = db.collection('users')
                 .doc(currentUser.uid)
                 .collection('tasks')
@@ -459,25 +447,22 @@ firebase.initializeApp(firebaseConfig);
 
             if (!currentUser) return;
 
-            const task = {
-                text: text,
-                category: currentCategory,
-                completed: false,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            };
-
             try {
                 await db.collection('users')
                     .doc(currentUser.uid)
                     .collection('tasks')
-                    .add(task);
+                    .add({
+                        text: text,
+                        category: currentCategory,
+                        completed: false,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
                 
                 input.value = '';
                 createConfetti();
             } catch (error) {
                 console.error('Error adding task:', error);
-                alert('Failed to add task. Please check your connection.');
+                alert('Failed to add task: ' + error.message);
             }
         }
 
@@ -495,9 +480,7 @@ firebase.initializeApp(firebaseConfig);
                         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
 
-                if (!task.completed) {
-                    createConfetti();
-                }
+                if (!task.completed) createConfetti();
             } catch (error) {
                 console.error('Error updating task:', error);
             }
@@ -505,7 +488,6 @@ firebase.initializeApp(firebaseConfig);
 
         async function deleteTask(id) {
             if (!currentUser) return;
-
             try {
                 await db.collection('users')
                     .doc(currentUser.uid)
@@ -584,7 +566,9 @@ firebase.initializeApp(firebaseConfig);
                     <label class="checkbox-wrapper cursor-pointer relative">
                         <input type="checkbox" class="hidden" ${task.completed ? 'checked' : ''} onchange="toggleTask('${task.id}')">
                         <div class="w-6 h-6 rounded-full border-2 border-white/40 flex items-center justify-center transition-all hover:border-white">
-                            <svg class="w-4 h-4 hidden text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                            <svg class="w-4 h-4 hidden text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+                            </svg>
                         </div>
                     </label>
                     
@@ -596,7 +580,9 @@ firebase.initializeApp(firebaseConfig);
                     </div>
                     
                     <button onclick="deleteTask('${task.id}')" class="delete-btn p-2 hover:bg-red-500/20 rounded-lg text-red-400 hover:text-red-300 transition-all">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
                     </button>
                 </div>
             `).join('');
@@ -633,24 +619,64 @@ firebase.initializeApp(firebaseConfig);
                 confetti.style.left = Math.random() * 100 + 'vw';
                 confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
                 confetti.style.animationDuration = (Math.random() * 2 + 2) + 's';
-                confetti.style.animationDelay = Math.random() * 0.5 + 's';
                 document.body.appendChild(confetti);
-                
                 setTimeout(() => confetti.remove(), 4000);
             }
         }
 
-        // Keyboard shortcuts
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('task-input')?.addEventListener('keypress', (e) => {
+        // ================= INITIALIZATION =================
+
+        // Auth state listener
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                currentUser = user;
+                document.getElementById('auth-section').classList.add('hidden');
+                document.getElementById('app-section').classList.remove('hidden');
+                loadTasks();
+                updateDate();
+            } else {
+                document.getElementById('auth-section').classList.remove('hidden');
+                document.getElementById('app-section').classList.add('hidden');
+            }
+        });
+
+        // Event listeners (using addEventListener instead of inline)
+        document.addEventListener('DOMContentLoaded', function() {
+            // Sign in button
+            document.getElementById('signin-btn').addEventListener('click', signIn);
+            
+            // Sign out button
+            document.getElementById('signout-btn').addEventListener('click', signOut);
+            
+            // Add task button
+            document.getElementById('add-task-btn').addEventListener('click', addTask);
+            
+            // Category buttons
+            document.querySelectorAll('.category-pill').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    setCategory(this.dataset.cat);
+                });
+            });
+            
+            // Filter buttons
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    filterTasks(this.dataset.filter);
+                });
+            });
+            
+            // Enter key on inputs
+            document.getElementById('email-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') signIn();
+            });
+            document.getElementById('password-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') signIn();
+            });
+            document.getElementById('task-input').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') addTask();
             });
             
-            document.getElementById('password-input')?.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') signIn();
-            });
-
-            // Network status monitoring
+            // Network status
             window.addEventListener('online', () => updateConnectionStatus(true));
             window.addEventListener('offline', () => updateConnectionStatus(false));
         });
